@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useState, useEffect } from 'react';
 import { Bars } from 'react-loader-spinner';
 
 import Searchbar from '../Searchbar/Searchbar';
@@ -8,132 +8,103 @@ import ImageDetails from './ImageDetails/ImageDetails';
 
 import Modal from 'components/shared/Modal/Modal';
 
-import { searchImage } from 'components/shared/services/posts-api';
+import { searchImage } from 'components/shared/services/images-api';
 
-class ImageFinder extends Component {
-  state = {
-    gallery: [],
-    searchQuery: '',
-    page: 1,
-    loading: false,
-    showMoodal: false,
-    details: null,
-    error: null,
-    perPage: 0,
+const ImageFinder = () => {
+  const [gallery, setGallery] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [details, setDetails] = useState(null);
+  const [error, setError] = useState(null);
+  const [perPage, setPerPage] = useState(0);
+
+  const handleSubmitBtn = query => {
+    if (searchQuery === query) {
+      return alert('Please try again with another word.');
+    }
+    setSearchQuery(query);
+    setPage(1);
+    setGallery([]);
   };
 
-  handleSubmitBtn = query => {
-    this.setState({ searchQuery: query, page: 1 });
-  };
-
-  componentDidUpdate(prevProps, prevState) {
-    const { searchQuery, page } = this.state;
-
-    if (
-      prevState.searchQuery === '' ||
-      searchQuery !== prevState.searchQuery ||
-      prevState.page !== page
-    ) {
-      if (searchQuery !== prevState.searchQuery) {
-        this.setState({
-          gallery: [],
-        });
+  useEffect(() => {
+    if (!searchQuery) {
+      return;
+    }
+    const fetchImages = async () => {
+      try {
+        setLoading(true);
+        const { data, perPage } = await searchImage(searchQuery, page);
+        if (data.totalHits === 0) {
+          return (
+            setLoading(false),
+            alert('Wrong query! Please, try with another word')
+          );
+        }
+        setPerPage(perPage);
+        setGallery(prevState => [...prevState, ...data.hits]);
+      } catch (error) {
+        setError(error.message);
+      } finally {
+        setLoading(false);
       }
+    };
+    fetchImages();
+  }, [page, searchQuery]);
 
-      this.fetchPosts();
-    }
-  }
-
-  async fetchPosts() {
-    try {
-      this.setState({
-        loading: true,
-      });
-      const { searchQuery, page } = this.state;
-      const { data, perPage } = await searchImage(searchQuery, page);
-      this.setState(({ gallery }) => ({
-        gallery: [...gallery, ...data.hits],
-        perPage,
-      }));
-    } catch (error) {
-      this.setState({ error: error.message });
-    } finally {
-      this.setState({ loading: false });
-    }
-  }
-
-  handleLoadMore = () => {
-    this.setState(({ page }) => ({
-      page: page + 1,
-    }));
+  const handleLoadMore = () => {
+    setPage(prevState => prevState + 1);
   };
 
-  showImage = img => {
-    this.setState({
-      details: img,
-      showMoodal: true,
-    });
+  const showImage = img => {
+    setDetails(img);
+    setShowModal(true);
   };
 
-  closeModal = () => {
-    this.setState({
-      showMoodal: false,
-      details: null,
-    });
+  const closeModal = () => {
+    setShowModal(false);
+    setDetails(null);
   };
 
-  render() {
-    const { handleSubmitBtn, handleLoadMore, closeModal, showImage } = this;
-    const {
-      searchQuery,
-      gallery,
-      loading,
-      error,
-      showMoodal,
-      details,
-      perPage,
-    } = this.state;
-
-    return (
+  return (
+    <div>
       <div>
-        <div className="{scss.imageFinder}">
-          <Searchbar searchQuery={searchQuery} onSubmit={handleSubmitBtn} />
-        </div>
-        <div className="gallery">
-          <ImageGallery
-            items={gallery}
-            showImage={showImage}
-            query={searchQuery}
-          />
-          {loading && (
-            <Bars
-              height="80"
-              width="180"
-              color="#000000"
-              ariaLabel="bars-loading"
-              wrapperStyle={{}}
-              wrapperClass=""
-              visible={true}
-            />
-          )}
-          {error && loading ? loading : <p>{error}</p>}
-        </div>
-        {!loading && gallery.length % perPage === 0 && gallery.length > 0 && (
-          <Button onLoadMore={handleLoadMore} />
-        )}
-
-        {showMoodal && (
-          <Modal close={closeModal}>
-            <ImageDetails details={details} />
-          </Modal>
-        )}
+        <Searchbar searchQuery={searchQuery} onSubmit={handleSubmitBtn} />
       </div>
-    );
-  }
-}
+      <div className="gallery">
+        <ImageGallery
+          items={gallery}
+          showImage={showImage}
+          query={searchQuery}
+        />
+        {loading && (
+          <Bars
+            height="80"
+            width="180"
+            color="#3f51b5"
+            ariaLabel="bars-loading"
+            wrapperStyle={{
+              marginLeft: '50vw',
+            }}
+            wrapperClass=""
+            visible={true}
+          />
+        )}
+        {error && loading ? loading && <p>{error}</p> : <p>{error}</p>}
+      </div>
+      {!loading && gallery.length % perPage === 0 && gallery.length > 0 && (
+        <Button onLoadMore={handleLoadMore} />
+      )}
+
+      {showModal && (
+        <Modal close={closeModal}>
+          <ImageDetails details={details} />
+        </Modal>
+      )}
+    </div>
+  );
+};
 
 export default ImageFinder;
-
-ImageFinder.defaultProps = {
-  gallery: [],
-};
